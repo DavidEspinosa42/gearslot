@@ -62,7 +62,12 @@ export function ConfirmSheet(props: Props) {
       }}
       className="sheet m-0 mx-auto mb-0 mt-auto w-full max-w-md rounded-t-2xl border border-line bg-card p-5 text-ink shadow-2xl backdrop:bg-ink/40 md:my-auto md:rounded-2xl"
     >
-      <h2 id="sheet-title" ref={heading} tabIndex={-1} className="m-0 text-xl font-semibold">
+      <h2
+        id="sheet-title"
+        ref={heading}
+        tabIndex={-1}
+        className="m-0 text-xl font-semibold outline-none"
+      >
         {titleFor(phase, props.resourceName)}
       </h2>
       <p className="m-0 mt-1 text-lg">{formatRange(start, end, timezone)}</p>

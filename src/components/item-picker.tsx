@@ -23,7 +23,7 @@ export function ItemPicker({ resources, selectedId, onSelect }: Props) {
   return (
     <nav
       aria-label="Equipment"
-      className="-mx-4 flex snap-x gap-5 overflow-x-auto px-4 pb-1 md:mx-0 md:snap-none md:flex-col md:gap-3 md:overflow-visible md:px-0"
+      className="-mx-4 flex scroll-px-4 snap-x gap-5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:snap-none md:flex-col md:gap-3 md:overflow-visible md:px-0"
     >
       {[...groups].map(([category, items]) => (
         <section
