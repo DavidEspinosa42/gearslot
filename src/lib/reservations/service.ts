@@ -60,6 +60,20 @@ function toDto(row: Reservation, resourceName: string): ReservationDto {
   };
 }
 
+/**
+ * The fingerprint of the request that created `row`. Rows from before `create_hash` existed carry an
+ * empty value; their still-original times give it back, so every operation that moves a booking calls
+ * this first and keeps the result, or a purged create key could no longer be reconciled.
+ */
+function createFingerprint(row: Reservation): string {
+  if (row.createHash !== "") return row.createHash;
+  return hashRequest("create", {
+    resourceId: row.resourceId,
+    startsAt: row.startsAt.getTime(),
+    endsAt: row.endsAt.getTime(),
+  });
+}
+
 /** Re-runs a whole transaction when PostgreSQL reports a deadlock or serialization failure. */
 async function withRetry<T>(run: () => Promise<T>): Promise<T | undefined> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -512,16 +526,7 @@ async function attemptReschedule(
           startsAt: input.startsAt,
           endsAt: input.endsAt,
           blockedUntil,
-          // Rows from before create_hash existed get it now, from their still-original times, so
-          // the first reschedule cannot erase what the create key stood for.
-          createHash:
-            row.createHash !== ""
-              ? row.createHash
-              : hashRequest("create", {
-                  resourceId: row.resourceId,
-                  startsAt: row.startsAt.getTime(),
-                  endsAt: row.endsAt.getTime(),
-                }),
+          createHash: createFingerprint(row),
         })
         .where(eq(reservations.id, row.id))
         .returning(),
@@ -532,6 +537,141 @@ async function attemptReschedule(
     if (!isExclusionViolation(error)) throw error;
     const suggestions = await buildSuggestions(tx, resource, request, now, rules);
     return problem(409, "conflict", "That time is no longer available.", { suggestions });
+  }
+}
+
+export interface SwapInput {
+  readonly actor: Actor;
+  readonly idempotencyKey: string;
+  readonly firstId: string;
+  readonly secondId: string;
+  readonly now: Date;
+}
+
+/**
+ * Exchanges the time ranges of two of the caller's bookings of the same item. The two rows are
+ * locked together through `lockReservationsInOrder`, so two swaps over the same pair can never wait
+ * on each other. The exclusion constraint is deferred while the ranges trade places and checked again
+ * before the savepoint is released, so it is still what decides (docs/adr/0010).
+ */
+export async function swapReservations(db: Database, rawInput: SwapInput): Promise<ServiceResult> {
+  // Ids come back from PostgreSQL in canonical lower case; compare and hash them the same way.
+  const input: SwapInput = {
+    ...rawInput,
+    firstId: rawInput.firstId.toLowerCase(),
+    secondId: rawInput.secondId.toLowerCase(),
+  };
+  const scope: KeyScope = { userId: input.actor.userId, key: input.idempotencyKey };
+  // Swapping A with B is the same request as swapping B with A.
+  const [low, high] = [input.firstId, input.secondId].sort();
+  const requestHash = hashRequest("swap", { first: low ?? "", second: high ?? "" });
+
+  const result = await withRetry(() =>
+    db.transaction(async (tx): Promise<ServiceResult> => {
+      const claim = await claimKey(tx, scope, "swap", requestHash);
+      if (claim.kind === "replay") {
+        return {
+          status: claim.statusCode,
+          body: claim.response as Record<string, unknown>,
+          replayed: true,
+        };
+      }
+      if (claim.kind === "mismatch") {
+        const { status, body } = problem(
+          422,
+          "idempotency_mismatch",
+          "This Idempotency-Key was already used for a different request.",
+        );
+        return { status, body, replayed: false };
+      }
+      const outcome = await attemptSwap(tx, input);
+      await storeOutcome(tx, scope, outcome.status, outcome.body);
+      return { ...outcome, replayed: false };
+    }),
+  );
+  return result ?? busy();
+}
+
+async function attemptSwap(
+  tx: Tx,
+  input: SwapInput,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const { actor, now } = input;
+  if (input.firstId === input.secondId) {
+    return problem(422, "not_swappable", "Pick two different bookings to swap.");
+  }
+
+  const rows = await lockReservationsInOrder(tx, [input.firstId, input.secondId]);
+  const first = rows.find((r) => r.id === input.firstId);
+  const second = rows.find((r) => r.id === input.secondId);
+  if (
+    first === undefined ||
+    second === undefined ||
+    first.userId !== actor.userId ||
+    second.userId !== actor.userId
+  ) {
+    return problem(404, "reservation_not_found", "No such reservation.");
+  }
+  if (first.status === "cancelled" || second.status === "cancelled") {
+    return problem(409, "already_cancelled", "A cancelled booking cannot be swapped.");
+  }
+  if (first.endsAt.getTime() <= now.getTime() || second.endsAt.getTime() <= now.getTime()) {
+    return problem(409, "already_ended", "A booking that has ended cannot be swapped.");
+  }
+  if (first.startsAt.getTime() < now.getTime() || second.startsAt.getTime() < now.getTime()) {
+    return problem(409, "already_started", "A booking that has started cannot be swapped.");
+  }
+  if (first.resourceId !== second.resourceId) {
+    return problem(422, "not_swappable", "Both bookings must be for the same item.");
+  }
+
+  const [resource] = await tx
+    .select()
+    .from(resources)
+    .where(and(eq(resources.id, first.resourceId), eq(resources.active, true)));
+  if (resource === undefined) return problem(404, "resource_not_found", "No such item.");
+
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${resource.id}, 0))`);
+  const blockedFor = (endsAt: Date) =>
+    new Date(endsAt.getTime() + resource.bufferMinutes * MS_PER_MINUTE);
+
+  try {
+    const swapped = await tx.transaction(async (savepoint) => {
+      // The two rows briefly overlap each other's old range, so the check waits until both moved.
+      await savepoint.execute(sql`SET CONSTRAINTS reservations_no_overlap DEFERRED`);
+      const [a] = await savepoint
+        .update(reservations)
+        .set({
+          startsAt: second.startsAt,
+          endsAt: second.endsAt,
+          blockedUntil: blockedFor(second.endsAt),
+          createHash: createFingerprint(first),
+        })
+        .where(eq(reservations.id, first.id))
+        .returning();
+      const [b] = await savepoint
+        .update(reservations)
+        .set({
+          startsAt: first.startsAt,
+          endsAt: first.endsAt,
+          blockedUntil: blockedFor(first.endsAt),
+          createHash: createFingerprint(second),
+        })
+        .where(eq(reservations.id, second.id))
+        .returning();
+      // Run the exclusion check now, inside the savepoint, so a violation is a clean 23P01 here.
+      await savepoint.execute(sql`SET CONSTRAINTS reservations_no_overlap IMMEDIATE`);
+      return [a, b] as const;
+    });
+    const [a, b] = swapped;
+    if (a === undefined || b === undefined) throw new Error("swap returned no rows");
+    return {
+      status: 200,
+      body: { reservations: [toDto(a, resource.name), toDto(b, resource.name)] },
+    };
+  } catch (error) {
+    if (!isExclusionViolation(error)) throw error;
+    return problem(409, "conflict", "Those bookings can no longer be swapped.");
   }
 }
 

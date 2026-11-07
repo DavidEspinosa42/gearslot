@@ -19,6 +19,8 @@ export type ProblemCode =
   | "reservation_not_found"
   | "already_cancelled"
   | "already_ended"
+  | "already_started"
+  | "not_swappable"
   | "idempotency_mismatch"
   | "unauthorized"
   | "invalid_request"
