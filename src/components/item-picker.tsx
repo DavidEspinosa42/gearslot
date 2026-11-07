@@ -9,8 +9,11 @@ interface Props {
 }
 
 /**
- * Items grouped by category. Tapping one is the first of the three taps. On a phone the groups sit
- * in one horizontally scrolling row so the timeline stays in view; on wider screens they stack.
+ * Items grouped by category. Tapping one is the first of the three taps.
+ *
+ * On a phone every item is a chip in one wrapping flow, in category order, so everything is on screen
+ * at once with no sideways scrolling; the names say what each item is, and the category headings are
+ * kept for screen readers. From the `md` breakpoint the categories stack with visible headings.
  */
 export function ItemPicker({ resources, selectedId, onSelect }: Props) {
   const groups = new Map<string, ResourceDto[]>();
@@ -21,18 +24,17 @@ export function ItemPicker({ resources, selectedId, onSelect }: Props) {
   }
 
   return (
-    <nav
-      aria-label="Equipment"
-      className="-mx-4 flex scroll-px-4 snap-x gap-5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:snap-none md:flex-col md:gap-3 md:overflow-visible md:px-0"
-    >
+    <nav aria-label="Equipment" className="flex flex-wrap gap-2 md:flex-col md:gap-3">
       {[...groups].map(([category, items]) => (
         <section
           key={category}
           aria-label={category}
-          className="flex shrink-0 snap-start flex-col gap-1.5 md:shrink"
+          className="contents md:flex md:flex-col md:gap-1.5"
         >
-          <h2 className="m-0 text-sm font-semibold text-ink-soft">{category}</h2>
-          <ul className="m-0 flex list-none gap-2 p-0 md:flex-wrap">
+          <h2 className="sr-only m-0 text-sm font-semibold text-ink-soft md:not-sr-only">
+            {category}
+          </h2>
+          <ul className="m-0 contents list-none p-0 md:flex md:flex-wrap md:gap-2">
             {items.map((item) => {
               const active = item.id === selectedId;
               return (
@@ -41,7 +43,7 @@ export function ItemPicker({ resources, selectedId, onSelect }: Props) {
                     type="button"
                     aria-pressed={active}
                     onClick={() => onSelect(item.id)}
-                    className={`min-h-11 whitespace-nowrap rounded-md border px-3.5 text-base ${
+                    className={`min-h-11 whitespace-nowrap rounded-md border px-3 text-base ${
                       active
                         ? "border-action bg-action font-semibold text-action-ink"
                         : "border-line bg-card text-ink"

@@ -77,9 +77,12 @@ body {
   background: var(--paper);
 }
 
-:focus-visible {
-  outline: 3px solid var(--action);
-  outline-offset: 2px;
+/* In the base layer so utilities such as outline-none can still override it deliberately. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--action);
+    outline-offset: 2px;
+  }
 }
 
 /* Taken time: diagonal gaff-tape hatching. */
