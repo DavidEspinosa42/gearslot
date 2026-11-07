@@ -38,7 +38,9 @@
    immediately (the exclusion constraint applies to `active` rows only).
 10. **Reschedule.** A person can move their own active, unfinished booking to another interval on the
     same item. The same rules and the same exclusion constraint apply; a clash is a `409` and the
-    old slot is kept. Swap is deferred (docs/adr/0010).
+    old slot is kept.
+    A person can also swap two of their own bookings of the same item that have not started; the two
+    time ranges (and their buffers) trade places (docs/adr/0010).
 11. **Retention.** Reservation history older than 12 months is purged; idempotency records older than
     7 days are purged.
 

@@ -80,7 +80,8 @@ pnpm test:integration   # real PostgreSQL via Testcontainers (Docker required)
 
 The integration suite includes the reference scenario (40 simultaneous requests, exactly one winner),
 raw concurrent inserts that bypass the app, idempotent retries, the category cap under parallel
-requests, ordered row locks, DST, and the retention purge. CI runs the same `pnpm check`.
+requests, ordered row locks (reschedule and swap), DST (New York and the lab's own zone), and the retention
+purge. CI runs the same `pnpm check`.
 
 Integration tests use `DATABASE_URL_TEST` when set (for example the service container in CI) and
 otherwise start a disposable `postgres` container. SQLite, MySQL and PGlite are not accepted
@@ -115,6 +116,7 @@ Writes require an `Idempotency-Key` header (a UUID generated per attempt).
 | GET | `/api/reservations` | The caller's active reservations | 200 | 401 |
 | POST | `/api/reservations` | Create a booking `{resourceId, startsAt, endsAt}` | 201 | 400, 409 `conflict` / `quota_exceeded`, 422 |
 | POST | `/api/reservations/{id}/reschedule` | Move your booking `{startsAt, endsAt}`; same item, same rules | 200 | 400, 404, 409 `conflict`, 422 |
+| POST | `/api/reservations/swap` | Exchange the times of two of your bookings of the same item `{firstId, secondId}` | 200 | 400, 404, 409, 422 |
 | POST | `/api/reservations/{id}/cancel` | Cancel (status change, no delete) | 200 | 404, 409 `already_cancelled` |
 
 ## Documentation

@@ -57,7 +57,8 @@ docs/                  domain, landscape, ADRs, screenshots
 2. **Concurrent requests resolve deterministically.** Inserts run in a transaction; `23P01` maps to
    `409`; losers never see `500`, a deadlock or a partial write. Anything locking several rows locks
    them in ascending id order through `lockReservationsInOrder`, then takes the resource lock
-   (docs/adr/0005). Reschedule is the live example.
+   (docs/adr/0005). Reschedule and swap are the live examples; swap relies on the constraint being
+   `DEFERRABLE INITIALLY IMMEDIATE` (docs/adr/0010), so never defer it anywhere else.
 3. **Writes are idempotent.** Create and cancel require `Idempotency-Key`; the same key and body
    replays the stored response, the same key with a different body is `422`.
 4. **The buffer counts toward conflicts** through `blocked_until`; a client never supplies it.
