@@ -19,6 +19,7 @@
       "preset": "recommended",
       "style": { "useImportType": "error", "noNonNullAssertion": "error" },
       "suspicious": { "noExplicitAny": "error" },
+      "complexity": { "useLiteralKeys": "off" },
       "correctness": { "noUnusedImports": "error", "noUnusedVariables": "error" }
     }
   },
