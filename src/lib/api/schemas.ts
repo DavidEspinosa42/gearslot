@@ -1,12 +1,15 @@
 import { z } from "zod";
 import { MAX_AVAILABILITY_MS } from "../reservations/service";
 
+/** UUIDs are compared and hashed as strings, so they are canonicalised to lower case on the way in. */
+const uuid = z.uuid().transform((value) => value.toLowerCase());
+
 const instant = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
 
 /** Body of `POST /api/reservations`. */
 export const createBodySchema = z
   .object({
-    resourceId: z.uuid(),
+    resourceId: uuid,
     startsAt: instant,
     endsAt: instant,
   })
@@ -14,6 +17,9 @@ export const createBodySchema = z
 
 /** Body of `POST /api/reservations/{id}/reschedule`. */
 export const rescheduleBodySchema = z.object({ startsAt: instant, endsAt: instant }).strict();
+
+/** Body of `POST /api/reservations/swap`. */
+export const swapBodySchema = z.object({ firstId: uuid, secondId: uuid }).strict();
 
 /** Query of `GET /api/resources/{id}/availability`. */
 export const availabilityQuerySchema = z
@@ -23,7 +29,7 @@ export const availabilityQuerySchema = z
     message: "The window can span at most 35 days",
   });
 
-export const uuidSchema = z.uuid();
+export const uuidSchema = uuid;
 
 /** Clients generate one key per attempt; a UUID is what the browser client sends. */
 const KEY_PATTERN = /^[A-Za-z0-9._~-]{8,128}$/;

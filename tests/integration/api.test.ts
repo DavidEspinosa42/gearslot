@@ -3,6 +3,7 @@ import { GET as getMe } from "../../src/app/api/me/route";
 import { POST as cancelRoute } from "../../src/app/api/reservations/[id]/cancel/route";
 import { POST as rescheduleRoute } from "../../src/app/api/reservations/[id]/reschedule/route";
 import { POST as createRoute, GET as listRoute } from "../../src/app/api/reservations/route";
+import { POST as swapRoute } from "../../src/app/api/reservations/swap/route";
 import { GET as availabilityRoute } from "../../src/app/api/resources/[id]/availability/route";
 import { GET as resourcesRoute } from "../../src/app/api/resources/route";
 import { connectTestDb, type LabFixture, resetDatabase, seedLab } from "./helpers";
@@ -291,5 +292,88 @@ describe("reschedule", () => {
       params,
     );
     expect(badBody.status).toBe(400);
+  });
+});
+
+describe("swap", () => {
+  const create = async (subject: string, startHours: number, endHours: number) => {
+    const response = await createRoute(
+      post("/api/reservations", as(subject, { "idempotency-key": crypto.randomUUID() }), {
+        resourceId: cameraId(2),
+        startsAt: inHours(startHours),
+        endsAt: inHours(endHours),
+      }),
+    );
+    return (await response.json()).reservation as { id: string; startsAt: string };
+  };
+
+  it("exchanges two of your bookings, replays on retry, and refuses someone else's", async () => {
+    const a = await create("sub-1", 48, 50);
+    const b = await create("sub-1", 60, 64);
+    const stranger = await create("sub-2", 72, 74);
+    const key = crypto.randomUUID();
+    const body = { firstId: a.id, secondId: b.id };
+
+    const done = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": key }), body),
+    );
+    expect(done.status).toBe(200);
+    const payload = await done.json();
+    expect(payload.reservations).toHaveLength(2);
+    expect(payload.reservations[0].startsAt).toBe(b.startsAt);
+
+    const retry = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": key }), body),
+    );
+    expect(retry.headers.get("idempotent-replayed")).toBe("true");
+
+    const refused = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": crypto.randomUUID() }), {
+        firstId: a.id,
+        secondId: stranger.id,
+      }),
+    );
+    expect(refused.status).toBe(404);
+  });
+
+  it("accepts upper-case UUIDs and treats them as the same request on replay", async () => {
+    const a = await create("sub-1", 48, 50);
+    const b = await create("sub-1", 60, 64);
+    const key = crypto.randomUUID();
+    const upper = { firstId: a.id.toUpperCase(), secondId: b.id.toUpperCase() };
+    const done = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": key }), upper),
+    );
+    expect(done.status).toBe(200);
+    const replay = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": key }), {
+        firstId: b.id,
+        secondId: a.id,
+      }),
+    );
+    expect(replay.headers.get("idempotent-replayed")).toBe("true");
+  });
+
+  it("books with an upper-case resource id", async () => {
+    const response = await createRoute(
+      post("/api/reservations", as("sub-1", { "idempotency-key": crypto.randomUUID() }), {
+        resourceId: cameraId(1).toUpperCase(),
+        startsAt: inHours(48),
+        endsAt: inHours(50),
+      }),
+    );
+    expect(response.status).toBe(201);
+  });
+
+  it("requires a key and two valid ids", async () => {
+    const noKey = await swapRoute(post("/api/reservations/swap", as("sub-1"), {}));
+    expect(noKey.status).toBe(400);
+    const bad = await swapRoute(
+      post("/api/reservations/swap", as("sub-1", { "idempotency-key": "some-key-123" }), {
+        firstId: "x",
+        secondId: "y",
+      }),
+    );
+    expect(bad.status).toBe(400);
   });
 });
