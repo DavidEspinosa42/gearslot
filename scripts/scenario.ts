@@ -6,11 +6,11 @@
  */
 import { isDeepStrictEqual } from "node:util";
 import { inArray } from "drizzle-orm";
-import { addDays, localDateKey, wallClockToUtc } from "../src/lib/booking/zone";
 import { connect } from "../src/lib/db/client";
 import { labSettings, reservations } from "../src/lib/db/schema";
 import { findResourceId, seedLab } from "../src/lib/db/seed";
 import { createReservation } from "../src/lib/reservations/service";
+import { nextFriday } from "./lib/friday";
 
 const STUDENTS = 40;
 const connectionString = process.env["DATABASE_URL"];
@@ -34,12 +34,7 @@ try {
   if (cameraId === undefined) throw new Error("Camera #2 is missing; run pnpm db:seed");
 
   // The next local Friday: 14:00-18:00 is the contested block, 18:00-20:00 touches it.
-  const today = localDateKey(Date.now(), timezone);
-  const [y = 1970, m = 1, d = 1] = today.split("-").map(Number);
-  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  const friday = addDays(today, (5 - weekday + 7) % 7 || 7);
-  const [fy = 1970, fm = 1, fd = 1] = friday.split("-").map(Number);
-  const at = (hour: number) => new Date(wallClockToUtc(Date.UTC(fy, fm - 1, fd, hour), timezone));
+  const { key: friday, at } = nextFriday(timezone);
 
   // Reruns stay repeatable: earlier scenario bookings are cancelled (a status change, never a delete).
   const people = Array.from({ length: STUDENTS + 1 }, (_, i) => user(i + 1));

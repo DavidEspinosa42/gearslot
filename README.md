@@ -100,6 +100,10 @@ by `pnpm db:migrate`. Moving from the local PGlite server to a hosted PostgreSQL
   audio recorders, plus a few reservations.
 - `pnpm scenario` replays the reference scenario in [docs/domain.md](docs/domain.md): 40 concurrent
   requests for "Camera #2, Friday 14:00-18:00". Exactly one wins; the rest get `409` with suggestions.
+- `pnpm scenario:http` runs the same race over real HTTP against a running server (`pnpm build && pnpm
+  start`, `BASE_URL` if not on port 3000). It needs a fresh database and prints why when the slot is
+  already taken. Over HTTP on a production build it reports 1 confirmed and 39 conflicts in about
+  0.6 s. The fixed Monday 09:00 clock version is `tests/integration/api-race.test.ts`.
 - `pnpm admin -- <command>` manages resources and categories (no admin UI in v1).
 - `pnpm purge` deletes reservation history older than the retention window.
 

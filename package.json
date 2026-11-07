@@ -34,7 +34,8 @@
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "scenario": "tsx --env-file-if-exists=.env scripts/scenario.ts",
     "purge": "tsx --env-file-if-exists=.env scripts/purge.ts",
-    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts"
+    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts",
+    "scenario:http": "tsx --env-file-if-exists=.env scripts/scenario-http.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
