@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from "vitest";
 import { GET as getMe } from "../../src/app/api/me/route";
 import { POST as cancelRoute } from "../../src/app/api/reservations/[id]/cancel/route";
+import { POST as rescheduleRoute } from "../../src/app/api/reservations/[id]/reschedule/route";
 import { POST as createRoute, GET as listRoute } from "../../src/app/api/reservations/route";
 import { GET as availabilityRoute } from "../../src/app/api/resources/[id]/availability/route";
 import { GET as resourcesRoute } from "../../src/app/api/resources/route";
@@ -225,5 +226,70 @@ describe("reads", () => {
       params,
     );
     expect(missing.status).toBe(422);
+  });
+});
+
+describe("reschedule", () => {
+  it("moves a booking, replays on retry, and answers 409 on a clash", async () => {
+    const created = await createRoute(
+      post("/api/reservations", as("sub-1", { "idempotency-key": crypto.randomUUID() }), {
+        resourceId: cameraId(2),
+        startsAt: inHours(48),
+        endsAt: inHours(52),
+      }),
+    );
+    const { reservation } = await created.json();
+    await createRoute(
+      post("/api/reservations", as("sub-2", { "idempotency-key": crypto.randomUUID() }), {
+        resourceId: cameraId(2),
+        startsAt: inHours(52),
+        endsAt: inHours(56),
+      }),
+    );
+    const params = { params: Promise.resolve({ id: reservation.id as string }) };
+    const path = `/api/reservations/${reservation.id}/reschedule`;
+
+    const clash = await rescheduleRoute(
+      post(path, as("sub-1", { "idempotency-key": crypto.randomUUID() }), {
+        startsAt: inHours(50),
+        endsAt: inHours(54),
+      }),
+      params,
+    );
+    expect(clash.status).toBe(409);
+
+    const key = crypto.randomUUID();
+    const body = { startsAt: inHours(60), endsAt: inHours(64) };
+    const moved = await rescheduleRoute(
+      post(path, as("sub-1", { "idempotency-key": key }), body),
+      params,
+    );
+    expect(moved.status).toBe(200);
+    const retry = await rescheduleRoute(
+      post(path, as("sub-1", { "idempotency-key": key }), body),
+      params,
+    );
+    expect(retry.headers.get("idempotent-replayed")).toBe("true");
+  });
+
+  it("requires a key and a valid body", async () => {
+    const id = crypto.randomUUID();
+    const params = { params: Promise.resolve({ id }) };
+    const noKey = await rescheduleRoute(
+      post(`/api/reservations/${id}/reschedule`, as("sub-1"), {}),
+      params,
+    );
+    expect(noKey.status).toBe(400);
+    const badBody = await rescheduleRoute(
+      post(
+        `/api/reservations/${id}/reschedule`,
+        as("sub-1", { "idempotency-key": "some-key-123" }),
+        {
+          startsAt: "x",
+        },
+      ),
+      params,
+    );
+    expect(badBody.status).toBe(400);
   });
 });

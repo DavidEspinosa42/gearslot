@@ -12,6 +12,9 @@ export const createBodySchema = z
   })
   .strict();
 
+/** Body of `POST /api/reservations/{id}/reschedule`. */
+export const rescheduleBodySchema = z.object({ startsAt: instant, endsAt: instant }).strict();
+
 /** Query of `GET /api/resources/{id}/availability`. */
 export const availabilityQuerySchema = z
   .object({ from: instant, to: instant })
