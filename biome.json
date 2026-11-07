@@ -1,7 +1,9 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!pnpm-lock.yaml", "!drizzle/meta", "!docs/screenshots"] },
+  "files": {
+    "includes": ["**", "!pnpm-lock.yaml", "!drizzle/meta", "!docs/screenshots", "!**/*.md"]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
