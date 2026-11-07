@@ -15,6 +15,13 @@
       "when": 1794065029585,
       "tag": "0001_exclusion_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794068198622,
+      "tag": "0002_reservation_create_hash",
+      "breakpoints": true
     }
   ]
 }

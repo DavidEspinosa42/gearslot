@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { formatClock } from "../../src/lib/client/format";
 import { reservations } from "../../src/lib/db/schema";
 import {
   type Actor,
@@ -295,5 +296,50 @@ describe("reads", () => {
       expect.objectContaining({ startsAt: "2026-11-13T21:00:00.000Z", mine: false }),
     ]);
     expect(JSON.stringify(blocks)).not.toContain("user-002");
+  });
+});
+
+describe("daylight saving (lab configured in a DST zone)", () => {
+  // New York falls back on 2026-11-01: 01:00-02:00 happens twice (05:00Z then 06:00Z).
+  const zone = "America/New_York";
+  const asOf = new Date("2026-10-30T12:00:00.000Z");
+
+  async function bookAt(n: number, start: string, end: string) {
+    return createReservation(handle.db, {
+      actor: student(n),
+      idempotencyKey: crypto.randomUUID(),
+      resourceId: camera(1),
+      startsAt: new Date(start),
+      endsAt: new Date(end),
+      now: asOf,
+    });
+  }
+
+  beforeEach(async () => {
+    await handle.db.execute(sql`UPDATE lab_settings SET timezone = ${zone}`);
+  });
+
+  it("treats the two 01:00-02:00 hours as different, touching, non-overlapping instants", async () => {
+    const first = await bookAt(1, "2026-11-01T05:00:00Z", "2026-11-01T06:00:00Z");
+    const second = await bookAt(2, "2026-11-01T06:00:00Z", "2026-11-01T07:00:00Z");
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    // Both display as 01:00 on the wall clock, which is exactly why storage must be absolute.
+    expect(formatClock(Date.parse("2026-11-01T05:00:00Z"), zone)).toBe("01:00");
+    expect(formatClock(Date.parse("2026-11-01T06:00:00Z"), zone)).toBe("01:00");
+  });
+
+  it("still detects a real overlap that straddles the repeated hour", async () => {
+    await bookAt(1, "2026-11-01T05:00:00Z", "2026-11-01T06:30:00Z");
+    const clash = await bookAt(2, "2026-11-01T06:00:00Z", "2026-11-01T07:00:00Z");
+    expect(clash).toMatchObject({ status: 409, body: { code: "conflict" } });
+  });
+
+  it("measures a booking across the shift in real elapsed time", async () => {
+    // 00:30 EDT to 02:30 EST is three real hours (04:30Z to 07:30Z).
+    const result = await bookAt(1, "2026-11-01T04:30:00Z", "2026-11-01T07:30:00Z");
+    expect(result.status).toBe(201);
+    const next = await bookAt(2, "2026-11-01T07:30:00Z", "2026-11-01T08:30:00Z");
+    expect(next.status).toBe(201);
   });
 });

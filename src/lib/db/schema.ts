@@ -96,6 +96,8 @@ export const reservations = pgTable(
       .notNull()
       .default("active"),
     idempotencyKey: text("idempotency_key").notNull(),
+    /** Fingerprint of the original create request. Immutable: a reschedule must not change it. */
+    createHash: text("create_hash").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },

@@ -1,0 +1,1 @@
+ALTER TABLE "reservations" ADD COLUMN "create_hash" text DEFAULT '' NOT NULL;

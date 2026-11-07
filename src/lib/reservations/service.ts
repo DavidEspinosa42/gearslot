@@ -216,7 +216,7 @@ export async function createReservation(db: Database, input: CreateInput): Promi
         return { status, body, replayed: false };
       }
 
-      const outcome = await attemptCreate(tx, input);
+      const outcome = await attemptCreate(tx, input, requestHash);
       await storeOutcome(tx, scope, outcome.status, outcome.body);
       return { ...outcome, replayed: false };
     }),
@@ -227,6 +227,7 @@ export async function createReservation(db: Database, input: CreateInput): Promi
 async function attemptCreate(
   tx: Tx,
   input: CreateInput,
+  requestHash: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const { actor, now } = input;
 
@@ -260,10 +261,14 @@ async function attemptCreate(
       ),
     );
   if (keyed !== undefined) {
+    // Compare with the fingerprint of the original create, not the current times: the reservation
+    // may have been rescheduled since. Rows from before the fingerprint existed fall back to times.
     const same =
-      keyed.resourceId === input.resourceId &&
-      keyed.startsAt.getTime() === input.startsAt.getTime() &&
-      keyed.endsAt.getTime() === input.endsAt.getTime();
+      keyed.createHash !== ""
+        ? keyed.createHash === requestHash
+        : keyed.resourceId === input.resourceId &&
+          keyed.startsAt.getTime() === input.startsAt.getTime() &&
+          keyed.endsAt.getTime() === input.endsAt.getTime();
     if (!same) {
       return problem(
         422,
@@ -332,6 +337,7 @@ async function attemptCreate(
           endsAt: input.endsAt,
           blockedUntil,
           idempotencyKey: input.idempotencyKey,
+          createHash: requestHash,
         })
         .returning(),
     );
@@ -407,6 +413,126 @@ async function attemptCancel(
     .returning();
   if (updated === undefined) throw new Error("cancel returned no row");
   return { status: 200, body: { reservation: toDto(updated, name) } };
+}
+
+export interface RescheduleInput {
+  readonly actor: Actor;
+  readonly idempotencyKey: string;
+  readonly reservationId: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly now: Date;
+}
+
+/**
+ * Moves the caller's reservation to a new interval on the same item. The reservation row is locked
+ * through `lockReservationsInOrder` (the shared multi-row locking path), then the update goes
+ * through the same exclusion constraint as a create, so a clash is a 409 and the old slot is kept.
+ */
+export async function rescheduleReservation(
+  db: Database,
+  input: RescheduleInput,
+): Promise<ServiceResult> {
+  const scope: KeyScope = { userId: input.actor.userId, key: input.idempotencyKey };
+  const requestHash = hashRequest("reschedule", {
+    reservationId: input.reservationId,
+    startsAt: input.startsAt.getTime(),
+    endsAt: input.endsAt.getTime(),
+  });
+
+  const result = await withRetry(() =>
+    db.transaction(async (tx): Promise<ServiceResult> => {
+      const claim = await claimKey(tx, scope, "reschedule", requestHash);
+      if (claim.kind === "replay") {
+        return {
+          status: claim.statusCode,
+          body: claim.response as Record<string, unknown>,
+          replayed: true,
+        };
+      }
+      if (claim.kind === "mismatch") {
+        const { status, body } = problem(
+          422,
+          "idempotency_mismatch",
+          "This Idempotency-Key was already used for a different request.",
+        );
+        return { status, body, replayed: false };
+      }
+      const outcome = await attemptReschedule(tx, input);
+      await storeOutcome(tx, scope, outcome.status, outcome.body);
+      return { ...outcome, replayed: false };
+    }),
+  );
+  return result ?? busy();
+}
+
+async function attemptReschedule(
+  tx: Tx,
+  input: RescheduleInput,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const { actor, now } = input;
+  const [row] = await lockReservationsInOrder(tx, [input.reservationId]);
+  if (row === undefined || row.userId !== actor.userId) {
+    return problem(404, "reservation_not_found", "No such reservation.");
+  }
+  if (row.status === "cancelled") {
+    return problem(409, "already_cancelled", "This reservation was cancelled.");
+  }
+  if (row.endsAt.getTime() <= now.getTime()) {
+    return problem(409, "already_ended", "This reservation has already ended.");
+  }
+
+  const [resource] = await tx
+    .select()
+    .from(resources)
+    .where(and(eq(resources.id, row.resourceId), eq(resources.active, true)));
+  if (resource === undefined) return problem(404, "resource_not_found", "No such item.");
+
+  const rules = rulesFrom(await loadSettings(tx));
+  const request: Interval = { start: input.startsAt.getTime(), end: input.endsAt.getTime() };
+  const violations = validateBooking(request, now.getTime(), rules);
+  const first = violations[0];
+  if (first !== undefined) {
+    return problem(422, first.code as ProblemCode, first.message, {
+      violations: violations.map((v) => ({ code: v.code, message: v.message })),
+    });
+  }
+  if (row.startsAt.getTime() === request.start && row.endsAt.getTime() === request.end) {
+    return { status: 200, body: { reservation: toDto(row, resource.name) } };
+  }
+
+  // Same queueing as create; the exclusion constraint still decides.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${resource.id}, 0))`);
+  const blockedUntil = new Date(input.endsAt.getTime() + resource.bufferMinutes * MS_PER_MINUTE);
+  try {
+    const [updated] = await tx.transaction(async (savepoint) =>
+      savepoint
+        .update(reservations)
+        .set({
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          blockedUntil,
+          // Rows from before create_hash existed get it now, from their still-original times, so
+          // the first reschedule cannot erase what the create key stood for.
+          createHash:
+            row.createHash !== ""
+              ? row.createHash
+              : hashRequest("create", {
+                  resourceId: row.resourceId,
+                  startsAt: row.startsAt.getTime(),
+                  endsAt: row.endsAt.getTime(),
+                }),
+        })
+        .where(eq(reservations.id, row.id))
+        .returning(),
+    );
+    if (updated === undefined) throw new Error("reschedule returned no row");
+    return { status: 200, body: { reservation: toDto(updated, resource.name) } };
+  } catch (error) {
+    if (!isExclusionViolation(error)) throw error;
+    const suggestions = await buildSuggestions(tx, resource, request, now, rules);
+    return problem(409, "conflict", "That time is no longer available.", { suggestions });
+  }
 }
 
 /** The caller's active, not yet finished reservations, soonest first. */
