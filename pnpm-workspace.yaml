@@ -6,4 +6,10 @@ strictDepBuilds: true
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
 savePrefix: ""
-allowBuilds: {}
+# Dependency build scripts are denied by default. Each entry below was reviewed and is not needed:
+# esbuild ships prebuilt platform binaries; the others are optional native accelerators.
+allowBuilds:
+  esbuild: false
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
