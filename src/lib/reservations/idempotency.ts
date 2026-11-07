@@ -36,30 +36,36 @@ export async function claimKey(
   operation: string,
   requestHash: string,
 ): Promise<Claim> {
-  const inserted = await tx
-    .insert(idempotencyRecords)
-    .values({
-      userId: scope.userId,
-      key: scope.key,
-      operation,
-      requestHash,
-      statusCode: 0,
-      response: {},
-    })
-    .onConflictDoNothing()
-    .returning({ key: idempotencyRecords.key });
-  if (inserted.length > 0) return { kind: "claimed" };
+  // The retention purge may delete the conflicting record between our insert and our select. When it
+  // has, the key is free again, so claim it afresh instead of failing the request.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const inserted = await tx
+      .insert(idempotencyRecords)
+      .values({
+        userId: scope.userId,
+        key: scope.key,
+        operation,
+        requestHash,
+        statusCode: 0,
+        response: {},
+      })
+      .onConflictDoNothing()
+      .returning({ key: idempotencyRecords.key });
+    if (inserted.length > 0) return { kind: "claimed" };
 
-  const [existing] = await tx
-    .select()
-    .from(idempotencyRecords)
-    .where(and(eq(idempotencyRecords.userId, scope.userId), eq(idempotencyRecords.key, scope.key)));
-  if (existing === undefined) {
-    // The conflicting record was removed between the two statements (purge). Treat as unclaimable.
-    throw new Error("idempotency record vanished during claim");
+    // FOR SHARE keeps a concurrent purge from deleting the record until this transaction ends.
+    const [existing] = await tx
+      .select()
+      .from(idempotencyRecords)
+      .where(
+        and(eq(idempotencyRecords.userId, scope.userId), eq(idempotencyRecords.key, scope.key)),
+      )
+      .for("share");
+    if (existing === undefined) continue;
+    if (existing.requestHash !== requestHash) return { kind: "mismatch" };
+    return { kind: "replay", statusCode: existing.statusCode, response: existing.response };
   }
-  if (existing.requestHash !== requestHash) return { kind: "mismatch" };
-  return { kind: "replay", statusCode: existing.statusCode, response: existing.response };
+  throw new Error("could not claim the idempotency key");
 }
 
 /** Records the outcome of a claimed key in the same transaction as the work it describes. */
