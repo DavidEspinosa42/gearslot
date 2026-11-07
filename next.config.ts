@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Keep AGENTS.md hand-written; do not let `next dev` append generated rules to it.
+  agentRules: false,
 };
 
 export default nextConfig;

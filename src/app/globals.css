@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+ * Look: equipment-label condensed type on cool paper. Taken time is drawn as cross-hatched
+ * gaff tape; your own bookings are teal; actions are ultramarine; red appears only for conflicts.
+ */
+:root {
+  --paper: #eef1f5;
+  --card: #ffffff;
+  --ink: #14213d;
+  --ink-soft: #4a5873;
+  --line: #c9d1de;
+  --action: #2740e8;
+  --action-ink: #ffffff;
+  --mine: #0b8a91;
+  --mine-bg: #d6f0f1;
+  --tape: #9aa6bb;
+  --tape-bg: #dfe4ec;
+  --alert: #c8321f;
+  --alert-bg: #fde8e4;
+  --ok-bg: #dff3e6;
+  --ok-ink: #14532d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1626;
+    --card: #17223a;
+    --ink: #e8edf7;
+    --ink-soft: #a3b0c8;
+    --line: #2c3a58;
+    --action: #7f93ff;
+    --action-ink: #0e1626;
+    --mine: #4fd1d9;
+    --mine-bg: #123c44;
+    --tape: #51607f;
+    --tape-bg: #1d2a46;
+    --alert: #ff8f7e;
+    --alert-bg: #4a1f1a;
+    --ok-bg: #123d26;
+    --ok-ink: #b7ebcb;
+  }
+}
+
+@theme inline {
+  --font-sans:
+    "Bahnschrift", "DIN Alternate", "Avenir Next Condensed", "Segoe UI Variable Text", system-ui,
+    sans-serif;
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-action: var(--action);
+  --color-action-ink: var(--action-ink);
+  --color-mine: var(--mine);
+  --color-mine-bg: var(--mine-bg);
+  --color-tape: var(--tape);
+  --color-tape-bg: var(--tape-bg);
+  --color-alert: var(--alert);
+  --color-alert-bg: var(--alert-bg);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-ink: var(--ok-ink);
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+:focus-visible {
+  outline: 3px solid var(--action);
+  outline-offset: 2px;
+}
+
+/* Taken time: diagonal gaff-tape hatching. */
+.taken {
+  background-color: var(--tape-bg);
+  background-image: repeating-linear-gradient(135deg, var(--tape) 0 1.5px, transparent 1.5px 7px);
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet {
+    animation: sheet-in 160ms ease-out;
+  }
+}
