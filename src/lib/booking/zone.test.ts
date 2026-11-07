@@ -107,3 +107,26 @@ describe("local day windows", () => {
     expect(day.start % (15 * MS_PER_MINUTE)).toBe(0);
   });
 });
+
+describe("the lab's own zone across a real offset change", () => {
+  // Argentina observed DST until 2009-03-15 02:00Z, when UTC-2 fell back to UTC-3.
+  it("changes offset exactly at the transition", () => {
+    expect(zoneOffsetMs(Date.UTC(2009, 2, 15, 1, 59), LAB)).toBe(-2 * MS_PER_HOUR);
+    expect(zoneOffsetMs(Date.UTC(2009, 2, 15, 2, 1), LAB)).toBe(-3 * MS_PER_HOUR);
+  });
+
+  it("makes the fall-back day 25 hours long and the next day start where it ends", () => {
+    const day = localDayWindow("2009-03-14", LAB);
+    expect((day.end - day.start) / MS_PER_HOUR).toBe(25);
+    expect(localDayWindow("2009-03-15", LAB).start).toBe(day.end);
+  });
+
+  it("shows two different instants as the same wall-clock hour", () => {
+    const first = Date.UTC(2009, 2, 15, 1, 0);
+    const second = Date.UTC(2009, 2, 15, 2, 0);
+    const wall = (instant: number) =>
+      new Date(instant + zoneOffsetMs(instant, LAB)).toISOString().slice(11, 16);
+    expect(wall(first)).toBe("23:00");
+    expect(wall(second)).toBe("23:00");
+  });
+});

@@ -343,3 +343,32 @@ describe("daylight saving (lab configured in a DST zone)", () => {
     expect(next.status).toBe(201);
   });
 });
+
+describe("daylight saving in the lab's own zone (Buenos Aires, 2009 fall-back)", () => {
+  // The default lab zone is used on purpose. Its DST ended 2009-03-15 02:00Z, so the local hour
+  // 23:00-24:00 happened twice: 01:00Z-02:00Z (UTC-2) and 02:00Z-03:00Z (UTC-3).
+  const asOf = new Date("2009-03-10T12:00:00.000Z");
+
+  const bookAt = (n: number, start: string, end: string) =>
+    createReservation(handle.db, {
+      actor: student(n),
+      idempotencyKey: crypto.randomUUID(),
+      resourceId: camera(1),
+      startsAt: new Date(start),
+      endsAt: new Date(end),
+      now: asOf,
+    });
+
+  it("books both repeated hours without a hidden overlap", async () => {
+    expect((await bookAt(1, "2009-03-15T01:00:00Z", "2009-03-15T02:00:00Z")).status).toBe(201);
+    expect((await bookAt(2, "2009-03-15T02:00:00Z", "2009-03-15T03:00:00Z")).status).toBe(201);
+    const lab = await handle.db.execute(sql`SELECT timezone FROM lab_settings`);
+    expect(lab.rows[0]?.["timezone"]).toBe("America/Argentina/Buenos_Aires");
+  });
+
+  it("still rejects a booking that overlaps across the transition", async () => {
+    await bookAt(1, "2009-03-15T01:00:00Z", "2009-03-15T02:30:00Z");
+    const clash = await bookAt(2, "2009-03-15T02:00:00Z", "2009-03-15T03:00:00Z");
+    expect(clash).toMatchObject({ status: 409, body: { code: "conflict" } });
+  });
+});
