@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { attemptIsFinished, createApi, newAttempt, type Outcome } from "./api";
+import {
+  attemptFor,
+  attemptIsFinished,
+  createApi,
+  NO_ATTEMPT,
+  newAttempt,
+  type Outcome,
+} from "./api";
 
 function stub(responses: (Response | Error)[]) {
   const calls: { path: string; init: RequestInit }[] = [];
@@ -121,5 +128,25 @@ describe("availability", () => {
         },
       ],
     });
+  });
+});
+
+describe("attemptFor", () => {
+  it("keeps the key for the same body, so a retry after a lost answer replays", () => {
+    const first = attemptFor(NO_ATTEMPT, "camera|1|2");
+    expect(first.key).not.toBe("");
+    expect(attemptFor(first, "camera|1|2")).toBe(first);
+  });
+
+  it("issues a fresh key when the body changes", () => {
+    const first = attemptFor(NO_ATTEMPT, "camera|1|2");
+    const other = attemptFor(first, "camera|1|3");
+    expect(other.key).not.toBe(first.key);
+    expect(other.body).toBe("camera|1|3");
+  });
+
+  it("issues a new key after an attempt was finished and cleared", () => {
+    const first = attemptFor(NO_ATTEMPT, "camera|1|2");
+    expect(attemptFor(NO_ATTEMPT, "camera|1|2").key).not.toBe(first.key);
   });
 });

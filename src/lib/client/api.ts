@@ -85,6 +85,22 @@ export function newAttempt(): Attempt {
   return { key: crypto.randomUUID() };
 }
 
+/** An attempt tied to the exact request body it was made for. */
+export interface BoundAttempt extends Attempt {
+  readonly body: string;
+}
+
+/** No attempt in flight. */
+export const NO_ATTEMPT: BoundAttempt = { key: "", body: "" };
+
+/**
+ * The attempt to use for `body`: the same body keeps its Idempotency-Key (so a retry replays the
+ * server's decision), a different body gets a fresh key (a reused key with another body is a 422).
+ */
+export function attemptFor(current: BoundAttempt, body: string): BoundAttempt {
+  return current.body === body && current.key !== "" ? current : { ...newAttempt(), body };
+}
+
 /**
  * Whether the attempt is over. A definitive answer (success, conflict, rule violation) closes it;
  * silence or a server error leaves the outcome unknown, so the retry must reuse the key and let the
