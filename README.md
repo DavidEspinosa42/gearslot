@@ -5,10 +5,14 @@ equipment (cameras, lenses, audio recorders, 3D printers) for a time block, and 
 a confirmed, conflict-free booking or an immediate, explicit rejection. It is built for phones on
 flaky campus Wi-Fi and for the rush when a new week of slots opens.
 
-<!-- screenshots: added in the docs pass -->
+## Screenshots
 
-> **Status:** under construction. Commands below are added commit by commit; see the git history
-> and [ROADMAP.md](ROADMAP.md).
+Dummy data only (the reference scenario from [docs/domain.md](docs/domain.md)). Taken time is the
+hatched block; the timezone is always labelled.
+
+| Phone: pick a free time | Phone: confirm | Desktop |
+| ----------------------- | -------------- | ------- |
+| ![Day timeline on a phone](docs/screenshots/mobile-timeline.png) | ![Confirm sheet on a phone](docs/screenshots/mobile-confirm.png) | ![Day timeline on a desktop](docs/screenshots/desktop-timeline.png) |
 
 ## Architecture
 
@@ -53,7 +57,9 @@ hardening.
 ## Setup
 
 Requirements: Node 26.13.0 and pnpm 12.16.1 (both pinned in `package.json` `devEngines`), plus Docker
-for the integration tests only.
+for the integration tests only. Authentication is the institution's SSO gateway in front of the app
+([ADR 0006](docs/adr/0006-identity-comes-from-the-sso-gateway.md)); in development `.env` supplies a
+fixed identity.
 
 ```sh
 pnpm install
@@ -71,6 +77,10 @@ pnpm check              # typecheck + lint + all tests
 pnpm test:unit          # pure core and property tests, no database
 pnpm test:integration   # real PostgreSQL via Testcontainers (Docker required)
 ```
+
+The integration suite includes the reference scenario (40 simultaneous requests, exactly one winner),
+raw concurrent inserts that bypass the app, idempotent retries, the category cap under parallel
+requests, ordered row locks, DST, and the retention purge. CI runs the same `pnpm check`.
 
 Integration tests use `DATABASE_URL_TEST` when set (for example the service container in CI) and
 otherwise start a disposable `postgres` container. SQLite, MySQL and PGlite are not accepted
@@ -100,10 +110,11 @@ Writes require an `Idempotency-Key` header (a UUID generated per attempt).
 | Method | Path | Purpose | Success | Errors |
 | ------ | ---- | ------- | ------- | ------ |
 | GET | `/api/me` | Current opaque user id and display name | 200 | 401 |
-| GET | `/api/resources` | Items with category, location label, buffer | 200 | 401 |
+| GET | `/api/resources` | The lab's rules (timezone, grid, limits) and its items with category, location label, buffer | 200 | 401 |
 | GET | `/api/resources/{id}/availability?from&to` | Taken blocks (buffer included) in a window | 200 | 404, 422 |
 | GET | `/api/reservations` | The caller's active reservations | 200 | 401 |
 | POST | `/api/reservations` | Create a booking `{resourceId, startsAt, endsAt}` | 201 | 400, 409 `conflict` / `quota_exceeded`, 422 |
+| POST | `/api/reservations/{id}/reschedule` | Move your booking `{startsAt, endsAt}`; same item, same rules | 200 | 400, 404, 409 `conflict`, 422 |
 | POST | `/api/reservations/{id}/cancel` | Cancel (status change, no delete) | 200 | 404, 409 `already_cancelled` |
 
 ## Documentation
@@ -112,7 +123,8 @@ Writes require an `Idempotency-Key` header (a UUID generated per attempt).
 - [ROADMAP.md](ROADMAP.md): what is built, what is next, estimates
 - [docs/domain.md](docs/domain.md): glossary, rules, defaults, reference scenario
 - [docs/landscape.md](docs/landscape.md): alternatives and how this differs
-- [docs/adr/](docs/adr/): architecture decision records
+- [docs/adr/](docs/adr/): ten architecture decision records, including the choices not made
+  (no Redis lock, no queue, no blockchain)
 
 ## Data policy
 
