@@ -22,7 +22,8 @@ over a half-open `[start, end)` interval, or an immediate explicit rejection. Re
 ## Layout
 
 ```
-src/app/               Next.js routes, route handlers (src/app/api), UI
+src/app/               Next.js routes and route handlers (src/app/api)
+src/components/        the booking screen (client components, Tailwind)
 src/lib/booking/       pure domain core: time, intervals, rules, suggestions (no I/O)
 src/lib/db/            Drizzle schema, client
 src/lib/reservations/  transactional create/cancel/list, idempotency
@@ -55,11 +56,14 @@ docs/                  domain, landscape, ADRs, screenshots
    Application "check then insert" does not count. Never drop, weaken or bypass it.
 2. **Concurrent requests resolve deterministically.** Inserts run in a transaction; `23P01` maps to
    `409`; losers never see `500`, a deadlock or a partial write. Anything locking several rows locks
-   them in ascending id order (`SELECT ... FOR UPDATE ORDER BY id`).
+   them in ascending id order through `lockReservationsInOrder`, then takes the resource lock
+   (docs/adr/0005). Reschedule is the live example.
 3. **Writes are idempotent.** Create and cancel require `Idempotency-Key`; the same key and body
    replays the stored response, the same key with a different body is `422`.
 4. **The buffer counts toward conflicts** through `blocked_until`; a client never supplies it.
-5. **No optimistic "booked".** The UI shows success only after the server confirms.
+5. **No optimistic "booked".** The UI shows success only after the server confirms, an attempt's
+   Idempotency-Key is bound to its exact request body, and unloaded availability is unknown, not free
+   (docs/adr/0007).
 
 ## Data policy
 

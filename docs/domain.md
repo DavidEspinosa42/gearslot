@@ -36,7 +36,10 @@
    Same key with a different body is `422 idempotency_mismatch`.
 9. **Cancel is a status change.** Only the owner can cancel. Cancelling frees the blocked range
    immediately (the exclusion constraint applies to `active` rows only).
-10. **Retention.** Reservation history older than 12 months is purged; idempotency records older than
+10. **Reschedule.** A person can move their own active, unfinished booking to another interval on the
+    same item. The same rules and the same exclusion constraint apply; a clash is a `409` and the
+    old slot is kept. Swap is deferred (docs/adr/0010).
+11. **Retention.** Reservation history older than 12 months is purged; idempotency records older than
     7 days are purged.
 
 ## Defaults (per-instance settings, not constants)
@@ -68,4 +71,6 @@ lenses and audio recorders. On Monday at 09:00:00.000 the week unlocks.
    second one.
 
 `pnpm db:seed` loads the lab and `pnpm scenario` reproduces steps 1-4 with dummy users
-(`user-001` ... `user-040`).
+(`user-001` ... `user-040`). The integration tests run it with the clock fixed at Monday
+2026-11-09 09:00:00.000 Buenos Aires time (12:00:00Z), including the touching 18:00-20:00 booking
+while the 40-way race is in flight.

@@ -6,11 +6,12 @@ Read in this order: `README.md`, `AGENTS.md`, `docs/domain.md`, `docs/adr/`, the
 
 ## Initial version (v1)
 
-One screen (pick item, pick slot, confirm), six endpoints, CLI scripts instead of an admin UI.
-PostgreSQL with `btree_gist` and an exclusion constraint guarantees no overlap; create and cancel are
-idempotent; conflicts return `409` with next-unit and next-slot suggestions. Local development runs on
-PGlite behind a socket server; tests run on real PostgreSQL. Estimated effort already spent is not
-listed below; the tables are the next work.
+One screen (pick item, pick slot, confirm), seven endpoints, CLI scripts instead of an admin UI.
+PostgreSQL with `btree_gist` and an exclusion constraint guarantees no overlap; create, cancel and
+reschedule are idempotent; conflicts return `409` with next-unit and next-slot suggestions. The UI
+shows success only after the server confirms. Local development runs on PGlite behind a socket
+server; tests run on real PostgreSQL, including the 40-way reference scenario. Effort already spent
+is not listed below; the tables are the next work.
 
 ## Next work
 
@@ -18,8 +19,8 @@ listed below; the tables are the next work.
 
 | Item | Hours |
 | ---- | ----: |
-| Reschedule with ordered row locks (`FOR UPDATE ORDER BY id`) | 10 |
-| Swap between two users' bookings, atomic | 12 |
+| Reschedule screen (the API and its ordered row locks exist) | 6 |
+| Swap two bookings atomically (deferrable constraint, see ADR 0010) | 12 |
 | Recurring weekly bookings with all-or-nothing creation | 14 |
 | Waitlist that offers a freed slot | 14 |
 
@@ -56,7 +57,7 @@ listed below; the tables are the next work.
 | Accessibility audit of the timeline (keyboard, screen reader) | 8 |
 | Localisation (es-AR, en) | 8 |
 
-**Total: 179 hours.**
+**Total: 175 hours.**
 
 ## Out of scope
 
