@@ -58,3 +58,26 @@ export function maxBookableMinutes(
   const minutes = Math.floor(room / rules.slotMinutes) * rules.slotMinutes;
   return minutes >= rules.minMinutes ? minutes : 0;
 }
+
+/**
+ * The length a new selection starts with: `preferred` minutes, rounded down to the slot grid and
+ * lifted to the shortest allowed length, never more than the `fits` the timeline offered.
+ */
+export function initialMinutes(fits: number, rules: BookingRules, preferred = 60): number {
+  const grid = rules.slotMinutes;
+  const wanted = Math.floor(Math.min(preferred, fits) / grid) * grid;
+  const shortest = Math.ceil(rules.minMinutes / grid) * grid;
+  return Math.min(fits, Math.max(wanted, shortest));
+}
+
+/** Quick-pick lengths that respect the grid, the minimum, and the room actually available. */
+export function durationPresets(
+  room: number,
+  rules: BookingRules,
+  candidates: readonly number[] = [30, 60, 120, 240],
+): number[] {
+  return candidates.filter(
+    (m) =>
+      m >= rules.minMinutes && m <= Math.min(room, rules.maxMinutes) && m % rules.slotMinutes === 0,
+  );
+}

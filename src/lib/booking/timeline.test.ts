@@ -2,7 +2,14 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { blockedRange, type Interval, MS_PER_DAY, MS_PER_MINUTE, overlaps } from "./interval";
 import { DEFAULT_RULES, isOnGrid, slotMs, validateBooking } from "./rules";
-import { type Block, daySlots, maxBookableMinutes, slotState } from "./timeline";
+import {
+  type Block,
+  daySlots,
+  durationPresets,
+  initialMinutes,
+  maxBookableMinutes,
+  slotState,
+} from "./timeline";
 import { localDayWindow } from "./zone";
 
 const NOW = Date.UTC(2026, 10, 9, 12, 0);
@@ -138,6 +145,55 @@ describe("maxBookableMinutes", () => {
             else if (!free) break;
           }
           expect(maxBookableMinutes(start, blocks, buffer, NOW, rules)).toBe(best);
+        },
+      ),
+    );
+  });
+});
+
+describe("initialMinutes and durationPresets", () => {
+  it("default to one hour on the standard grid", () => {
+    expect(initialMinutes(240, rules)).toBe(60);
+    expect(initialMinutes(30, rules)).toBe(30);
+    expect(durationPresets(240, rules)).toEqual([30, 60, 120, 240]);
+    expect(durationPresets(90, rules)).toEqual([30, 60]);
+  });
+
+  it("respect a 45-minute grid: nothing off-grid is offered", () => {
+    const grid45 = { slotMinutes: 45, minMinutes: 45, maxMinutes: 360, horizonDays: 30 };
+    expect(initialMinutes(180, grid45)).toBe(45);
+    expect(durationPresets(180, grid45)).toEqual([]);
+  });
+
+  it("respect a minimum above the preferred length", () => {
+    const strict = { slotMinutes: 15, minMinutes: 120, maxMinutes: 480, horizonDays: 30 };
+    expect(initialMinutes(240, strict)).toBe(120);
+    expect(durationPresets(240, strict)).toEqual([120, 240]);
+  });
+
+  it("always yields a length the rules accept (property)", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(15, 30, 45, 60),
+        fc.integer({ min: 1, max: 8 }),
+        fc.integer({ min: 1, max: 40 }),
+        (slot, minSlots, fitSlots) => {
+          const custom = {
+            slotMinutes: slot,
+            minMinutes: minSlots * slot,
+            maxMinutes: 100 * slot,
+            horizonDays: 30,
+          };
+          const fits = Math.max(fitSlots, minSlots) * slot;
+          const minutes = initialMinutes(fits, custom);
+          expect(minutes % slot).toBe(0);
+          expect(minutes).toBeGreaterThanOrEqual(custom.minMinutes);
+          expect(minutes).toBeLessThanOrEqual(fits);
+          for (const preset of durationPresets(fits, custom)) {
+            expect(preset % slot).toBe(0);
+            expect(preset).toBeGreaterThanOrEqual(custom.minMinutes);
+            expect(preset).toBeLessThanOrEqual(fits);
+          }
         },
       ),
     );
