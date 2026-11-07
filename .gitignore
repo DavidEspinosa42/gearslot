@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# local database and secrets
+.pglite/
+.env
+.env.*
+!.env.example
+
+# tooling
+.DS_Store
+Thumbs.db
+*.log
+.claude/
