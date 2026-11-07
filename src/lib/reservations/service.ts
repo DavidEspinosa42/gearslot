@@ -41,7 +41,7 @@ export function rulesFrom(settings: LabSettings): BookingRules {
   };
 }
 
-export async function loadSettings(tx: Tx): Promise<LabSettings> {
+export async function loadSettings(tx: Pick<Database, "select">): Promise<LabSettings> {
   const [settings] = await tx.select().from(labSettings);
   if (settings === undefined) throw new Error("lab_settings row is missing (run migrations)");
   return settings;
@@ -428,6 +428,26 @@ export async function listMyReservations(
     )
     .orderBy(asc(reservations.startsAt));
   return rows.map((row) => toDto(row.reservation, row.resourceName));
+}
+
+export interface LabDto {
+  readonly timezone: string;
+  readonly slotMinutes: number;
+  readonly minMinutes: number;
+  readonly maxMinutes: number;
+  readonly horizonDays: number;
+}
+
+/** The per-instance rules the client needs to render the timeline and validate inputs early. */
+export async function getLab(db: Database): Promise<LabDto> {
+  const settings = await loadSettings(db);
+  return {
+    timezone: settings.timezone,
+    slotMinutes: settings.slotMinutes,
+    minMinutes: settings.minMinutes,
+    maxMinutes: settings.maxMinutes,
+    horizonDays: settings.horizonDays,
+  };
 }
 
 export interface ResourceDto {

@@ -20,7 +20,12 @@ export type ProblemCode =
   | "already_cancelled"
   | "already_ended"
   | "idempotency_mismatch"
-  | "busy";
+  | "unauthorized"
+  | "invalid_request"
+  | "missing_idempotency_key"
+  | "invalid_window"
+  | "busy"
+  | "internal";
 
 /** RFC 9457 problem body with a stable machine-readable `code`. */
 export function problem(
