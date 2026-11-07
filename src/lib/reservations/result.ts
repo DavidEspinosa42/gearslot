@@ -38,7 +38,7 @@ export function problem(
 ): { status: number; body: Record<string, unknown> } {
   return {
     status,
-    body: { type: `https://loan-loop.dev/problems/${code}`, title, status, code, ...extra },
+    body: { type: `https://gearslot.dev/problems/${code}`, title, status, code, ...extra },
   };
 }
 

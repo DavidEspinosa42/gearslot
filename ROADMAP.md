@@ -32,6 +32,17 @@ is not listed below; the tables are the next work.
 | Roles: staff may book beyond the cap, with audit trail | 8 |
 | Rate limiting per subject on write endpoints | 5 |
 
+### Equipment lifecycle
+
+These three build on staff roles (see Identity and access). None of them may store contact details
+or other personal data beyond the opaque subject and display name.
+
+| Item | Hours |
+| ---- | ----: |
+| Approvals workflow: items or categories that need staff approval, a `pending` status that holds the slot through the same exclusion constraint, approve and deny actions, expiry of unanswered requests | 16 |
+| Check-in and check-out: staff mark handover and return, release of a no-show after a grace period, late-return flag that blocks the next booking's pickup | 14 |
+| Damage tracking: condition note on return, an item taken out of service (blocking new bookings like a blackout date), repair status and history, with the same 12-month retention | 12 |
+
 ### Offline and mobile
 
 | Item | Hours |
@@ -57,9 +68,9 @@ is not listed below; the tables are the next work.
 | Accessibility audit of the timeline (keyboard, screen reader) | 8 |
 | Localisation (es-AR, en) | 8 |
 
-**Total: 167 hours.**
+**Total: 209 hours.**
 
 ## Out of scope
 
-Payments, approvals workflows, check-in/check-out and damage tracking, email or SMS notifications
-(the app stores no contact data), calendar sync, multi-lab tenancy, blockchain-style ledgers.
+Payments, email or SMS notifications (the app stores no contact data), calendar sync, multi-lab
+tenancy, blockchain-style ledgers.

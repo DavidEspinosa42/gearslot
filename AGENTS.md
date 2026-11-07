@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules for anyone (human or agent) changing loan-loop.
+Rules for anyone (human or agent) changing Gearslot.
 
 ## Project
 

@@ -19,7 +19,7 @@ export async function setup(project: TestProject): Promise<void> {
   let url = process.env["DATABASE_URL_TEST"];
   if (url === undefined || url === "") {
     container = await new PostgreSqlContainer("postgres:18-alpine")
-      .withDatabase("loanloop_test")
+      .withDatabase("gearslot_test")
       .withCommand(["postgres", "-c", "max_connections=200"])
       .start();
     url = container.getConnectionUri();

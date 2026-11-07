@@ -260,7 +260,7 @@ export function BookingApp() {
   return (
     <main className="mx-auto max-w-5xl px-4 pb-16 pt-5">
       <header className="mb-4">
-        <h1 className="m-0 text-3xl font-semibold tracking-tight">loan-loop</h1>
+        <h1 className="m-0 text-3xl font-semibold tracking-tight">Gearslot</h1>
         <p className="m-0 mt-1 text-ink-soft">
           All times are {cityOf(timezone)} time ({zoneLabel(now, timezone)}).
         </p>
@@ -373,7 +373,7 @@ export function BookingApp() {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-5xl px-4 pt-8">
-      <h1 className="m-0 text-3xl font-semibold tracking-tight">loan-loop</h1>
+      <h1 className="m-0 text-3xl font-semibold tracking-tight">Gearslot</h1>
       <p className="mt-3 text-ink-soft">{children}</p>
     </main>
   );

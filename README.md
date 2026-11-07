@@ -1,6 +1,6 @@
-# loan-loop
+# Gearslot
 
-loan-loop lets staff and students of a university media lab reserve one specific piece of shared
+Gearslot lets staff and students of a university media lab reserve one specific piece of shared
 equipment (cameras, lenses, audio recorders, 3D printers) for a time block, and answers with either
 a confirmed, conflict-free booking or an immediate, explicit rejection. It is built for phones on
 flaky campus Wi-Fi and for the rush when a new week of slots opens.
@@ -49,10 +49,23 @@ Two rules hold throughout:
 
 ## Built with
 
-Next.js (App Router, Turbopack, Cache Components, typed routes) · React · TypeScript (strictest
-flags) · Tailwind CSS v4 · zod · Drizzle ORM + `pg` · PostgreSQL with `btree_gist` · PGlite for
-local development · Biome · Vitest + fast-check + Testcontainers · pnpm with supply-chain
-hardening.
+Versions are pinned exactly in `package.json`; a release must be 7.5 days old before pnpm installs it.
+
+| Layer | Technology | Version | Role here |
+| ----- | ---------- | ------- | --------- |
+| Runtime | Node.js | 26.13.0 | Pinned through `devEngines` |
+| Package manager | pnpm | 12.16.1 | `minimumReleaseAge` 10800 min, dependency build scripts denied by default |
+| Framework | Next.js | 16.4.3 | App Router, Turbopack, Cache Components, typed routes, route handlers for the API |
+| UI | React | 19.3.1 | The single booking screen |
+| Styling | Tailwind CSS | 4.3.3 | Design tokens in CSS, light and dark |
+| Language | TypeScript | 7.0.2 | Strictest compiler flags |
+| Validation | zod | 4.6.7 | Request bodies, queries and headers |
+| Database | PostgreSQL with `btree_gist` | 18 (tests) | Required. The exclusion constraint is the overlap guarantee |
+| Data access | Drizzle ORM, drizzle-kit, `pg` | 0.45.4, 0.31.11, 8.23.1 | Schema, migrations, pooled connections |
+| Local database | PGlite and pglite-socket | 0.5.13, 0.2.16 | Postgres in WASM behind a socket, no Docker for development |
+| Lint and format | Biome | 2.6.4 | One tool for both |
+| Tests | Vitest, fast-check, Testcontainers | 5.0.5, 4.10.2, 12.2.1 | Unit, property and real-PostgreSQL concurrency tests |
+| CI | GitHub Actions | pinned to commit SHAs | `pnpm check` and `pnpm build` |
 
 ## Setup
 
@@ -138,6 +151,11 @@ Only an opaque SSO subject id and a display name are stored for people. No email
 student numbers or other personal data. Cancelled reservations keep a `cancelled` status instead of
 being deleted; history older than 12 months is purged.
 
-## Ownership and license
+## Ownership
 
-Maintained by David Espinosa. Released under the [MIT License](LICENSE).
+This is a 100% independent, personal side project. It is not related to,
+sponsored by, or developed for any employer or client.
+
+## License
+
+Released under the MIT License. See [LICENSE](LICENSE).

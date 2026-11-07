@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "loan-loop",
+  title: "Gearslot",
   description: "Reserve shared media-lab equipment without double bookings.",
 };
 
