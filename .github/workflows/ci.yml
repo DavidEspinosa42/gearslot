@@ -32,13 +32,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Real PostgreSQL 18 from the PGDG apt repository, as a native service on the runner.
-      - name: Install PostgreSQL 18
+      # Real PostgreSQL 18 as a native service on the runner. The image may already ship it, so the
+      # PGDG install is a no-op there; the service is started explicitly either way.
+      - name: Start PostgreSQL 18
         run: |
-          sudo systemctl stop postgresql || true
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-18
+          sudo systemctl start postgresql
+          for i in $(seq 1 30); do pg_isready -h 127.0.0.1 -p 5432 && break; sleep 1; done
+          pg_isready -h 127.0.0.1 -p 5432
           sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres'"
           sudo -u postgres createdb gearslot_test
 
