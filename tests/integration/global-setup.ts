@@ -1,4 +1,5 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { TestProject } from "vitest/node";
 import { connect } from "../../src/lib/db/client";
@@ -9,20 +10,29 @@ declare module "vitest" {
   }
 }
 
-let container: StartedPostgreSqlContainer | undefined;
+/** DATABASE_URL_TEST from the environment, else from `.env`. Nothing else in `.env` is loaded. */
+function readTestDatabaseUrl(): string | undefined {
+  const fromEnv = process.env["DATABASE_URL_TEST"];
+  if (fromEnv !== undefined && fromEnv !== "") return fromEnv;
+  try {
+    return parseEnv(readFileSync(".env", "utf8"))["DATABASE_URL_TEST"];
+  } catch {
+    return undefined;
+  }
+}
 
 /**
- * Starts a real PostgreSQL (never SQLite, MySQL or PGlite: see docs/adr/0004), or uses
- * DATABASE_URL_TEST when provided, then applies the migrations once for the whole run.
+ * Uses the locally installed PostgreSQL named by DATABASE_URL_TEST (never SQLite, MySQL or PGlite:
+ * see docs/adr/0004), then applies the migrations once for the whole run. The tests truncate every
+ * table, so the URL must point at a throwaway database.
  */
 export async function setup(project: TestProject): Promise<void> {
-  let url = process.env["DATABASE_URL_TEST"];
+  const url = readTestDatabaseUrl();
   if (url === undefined || url === "") {
-    container = await new PostgreSqlContainer("postgres:18-alpine")
-      .withDatabase("gearslot_test")
-      .withCommand(["postgres", "-c", "max_connections=200"])
-      .start();
-    url = container.getConnectionUri();
+    throw new Error(
+      "DATABASE_URL_TEST is not set. Point it at a local PostgreSQL test database " +
+        "(see .env.example and the README).",
+    );
   }
 
   const handle = connect({ connectionString: url, poolMax: 1 });
@@ -32,8 +42,4 @@ export async function setup(project: TestProject): Promise<void> {
     await handle.close();
   }
   project.provide("databaseUrl", url);
-}
-
-export async function teardown(): Promise<void> {
-  await container?.stop();
 }
