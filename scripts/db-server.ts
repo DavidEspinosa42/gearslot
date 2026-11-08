@@ -1,6 +1,6 @@
 /**
  * Local development database: PGlite (PostgreSQL compiled to WASM) behind a TCP socket, so the app
- * connects with an ordinary `postgres://` URL. Data persists in `.pglite/`. No Docker needed.
+ * connects with an ordinary `postgres://` URL. Data persists in `.pglite/`.
  * Concurrency tests do NOT use this server; see docs/adr/0004.
  */
 import { PGlite } from "@electric-sql/pglite";

@@ -17,4 +17,4 @@ Gearslot does one thing: hand out a conflict-free `[start, end)` block of a spec
 at once. Correctness lives in PostgreSQL (an exclusion constraint over the blocked range), so even
 forty simultaneous requests for the same slot produce exactly one winner and 39 clean `409`s with
 useful alternatives. It stores no personal data beyond an opaque SSO subject and a display name, runs
-locally without Docker, and leaves approvals, payments, check-in and an admin UI out of scope.
+locally, and leaves approvals, payments, check-in and an admin UI out of scope.

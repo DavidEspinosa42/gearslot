@@ -62,22 +62,22 @@ Versions are pinned exactly in `package.json`; a release must be 7.5 days old be
 | Validation | zod | 4.6.7 | Request bodies, queries and headers |
 | Database | PostgreSQL with `btree_gist` | 18 (tests) | Required. The exclusion constraint is the overlap guarantee |
 | Data access | Drizzle ORM, drizzle-kit, `pg` | 0.45.4, 0.31.11, 8.23.1 | Schema, migrations, pooled connections |
-| Local database | PGlite and pglite-socket | 0.5.13, 0.2.16 | Postgres in WASM behind a socket, no Docker for development |
+| Local database | PGlite and pglite-socket | 0.5.13, 0.2.16 | Postgres in WASM behind a socket, for development |
 | Lint and format | Biome | 2.6.4 | One tool for both |
-| Tests | Vitest, fast-check, Testcontainers | 5.0.5, 4.10.2, 12.2.1 | Unit, property and real-PostgreSQL concurrency tests |
+| Tests | Vitest, fast-check | 5.0.5, 4.10.2 | Unit, property and real-PostgreSQL concurrency tests |
 | CI | GitHub Actions | pinned to commit SHAs | `pnpm check` and `pnpm build` |
 
 ## Setup
 
-Requirements: Node 26.13.0 and pnpm 12.16.1 (both pinned in `package.json` `devEngines`), plus Docker
-for the integration tests only. Authentication is the institution's SSO gateway in front of the app
+Requirements: Node 26.13.0 and pnpm 12.16.1 (both pinned in `package.json` `devEngines`), plus a locally
+installed PostgreSQL 18 for the integration tests only ([setup](#integration-test-database)). Authentication is the institution's SSO gateway in front of the app
 ([ADR 0006](docs/adr/0006-identity-comes-from-the-sso-gateway.md)); in development `.env` supplies a
 fixed identity.
 
 ```sh
 pnpm install
 cp .env.example .env
-pnpm db:server      # terminal 1: local Postgres (PGlite behind a socket), no Docker needed
+pnpm db:server      # terminal 1: local Postgres (PGlite behind a socket)
 pnpm db:migrate     # terminal 2
 pnpm db:seed        # reference scenario with dummy data
 pnpm dev
@@ -88,7 +88,7 @@ pnpm dev
 ```sh
 pnpm check              # typecheck + lint + all tests
 pnpm test:unit          # pure core and property tests, no database
-pnpm test:integration   # real PostgreSQL via Testcontainers (Docker required)
+pnpm test:integration   # real PostgreSQL (DATABASE_URL_TEST)
 ```
 
 The integration suite includes the reference scenario (40 simultaneous requests, exactly one winner),
@@ -96,10 +96,24 @@ raw concurrent inserts that bypass the app, idempotent retries, the category cap
 requests, ordered row locks (reschedule and swap), DST (New York and the lab's own zone), and the retention
 purge. CI runs the same `pnpm check`.
 
-Integration tests use `DATABASE_URL_TEST` when set (for example the service container in CI) and
-otherwise start a disposable `postgres` container. SQLite, MySQL and PGlite are not accepted
+Integration tests run against the PostgreSQL named by `DATABASE_URL_TEST`. SQLite, MySQL and PGlite are not accepted
 stand-ins for the concurrency tests; see
 [ADR 0004](docs/adr/0004-real-postgres-for-concurrency-tests.md).
+
+## Integration test database
+
+Install PostgreSQL 18 (it includes `btree_gist`), then create an empty database and point
+`DATABASE_URL_TEST` at it in `.env`. The tests truncate every table, so the database name must end in
+`_test`; the suite refuses to start otherwise.
+
+```sh
+psql -U postgres -c "CREATE DATABASE gearslot_test;"
+# .env
+DATABASE_URL_TEST=postgres://postgres:<password>@127.0.0.1:5432/gearslot_test
+```
+
+The server needs `max_connections` of at least 100 (the default). The suite applies the migrations
+itself. Stop the server when you are not testing if you want the memory back.
 
 ## Database
 

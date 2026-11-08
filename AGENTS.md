@@ -14,7 +14,7 @@ over a half-open `[start, end)` interval, or an immediate explicit rejection. Re
 | ------- | ------------ |
 | `pnpm dev` | Next.js dev server (Turbopack) |
 | `pnpm check` | typecheck + lint + all tests; must pass before every commit |
-| `pnpm test:unit` / `pnpm test:integration` | pure tests / real-Postgres tests (Docker) |
+| `pnpm test:unit` / `pnpm test:integration` | pure tests / real-Postgres tests (local PostgreSQL) |
 | `pnpm db:server` / `db:migrate` / `db:seed` | local PGlite socket server / migrations / dummy data |
 | `pnpm scenario` | the 40-way reference scenario |
 | `pnpm format` | Biome autofix |
