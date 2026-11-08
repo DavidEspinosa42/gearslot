@@ -32,8 +32,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Typecheck, Biome, unit and property tests, then the integration suite against a real
-      # PostgreSQL started by Testcontainers (Docker is available on ubuntu-latest).
+      # Real PostgreSQL 18 from the PGDG apt repository, as a native service on the runner.
+      - name: Install PostgreSQL 18
+        run: |
+          sudo systemctl stop postgresql || true
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-18
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres'"
+          sudo -u postgres createdb gearslot_test
+
+      # Typecheck, Biome, unit and property tests, then the integration suite.
       - run: pnpm check
+        env:
+          DATABASE_URL_TEST: postgres://postgres:postgres@127.0.0.1:5432/gearslot_test
 
       - run: pnpm build
