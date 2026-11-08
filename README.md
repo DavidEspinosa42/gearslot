@@ -49,12 +49,12 @@ Two rules hold throughout:
 
 ## Built with
 
-Versions are pinned exactly in `package.json`; a release must be 7.5 days old before pnpm installs it.
+Versions are pinned exactly in `package.json`; a release must be 7 days old before pnpm installs it.
 
 | Layer | Technology | Version | Role here |
 | ----- | ---------- | ------- | --------- |
 | Runtime | Node.js | 26.13.0 | Pinned through `devEngines` |
-| Package manager | pnpm | 12.16.1 | `minimumReleaseAge` 10800 min, dependency build scripts denied by default |
+| Package manager | pnpm | 12.16.1 | `minimumReleaseAge` 10080 min, dependency build scripts denied by default |
 | Framework | Next.js | 16.4.3 | App Router, Turbopack, Cache Components, typed routes, route handlers for the API |
 | UI | React | 19.3.1 | The single booking screen |
 | Styling | Tailwind CSS | 4.3.3 | Design tokens in CSS, light and dark |

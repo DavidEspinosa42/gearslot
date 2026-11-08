@@ -1,6 +1,6 @@
 # Supply-chain hardening. Versions are pinned exactly in package.json, and a
-# release must be at least 7.5 days (10800 minutes) old before it can be installed.
-minimumReleaseAge: 10800
+# release must be at least 7 days (10080 minutes) old before it can be installed.
+minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 strictDepBuilds: true
 blockExoticSubdeps: true
